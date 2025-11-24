@@ -1,17 +1,30 @@
-  "clientName": "Client 1",
-  "title": "Sondage - Client 1",
-  "logo": "https://via.placeholder.com/300x80?text=Client+1+Logo",
-  "color": "#346beb",
-  "categories": [
-    {
-      "id": "produits",
-      "question": "Quels produits utilisez-vous ?",
-      "options": ["Produit A", "Produit B", "Produit C", "Produit D", "Produit E"]
-    },
-    {
-      "id": "services",
-      "question": "Quels services vous intéressent ?",
-      "options": ["Service 1", "Service 2", "Service 3", "Service 4", "Service 5"]
-    }
-  ]
-
+{
+  "clientId": "client_1",
+  "logo": "assets/logos/client_1.png",
+  "categories": {
+    "Boissons": [
+      "Café",
+      "Thé",
+      "Jus",
+      "Soda",
+      "Eau",
+      "Smoothie",
+      "Milkshake",
+      "Énergisant",
+      "Infusion",
+      "Chocolat chaud"
+    ],
+    "Pâtisseries": [
+      "Croissant",
+      "Pain au chocolat",
+      "Brioche",
+      "Tartelette",
+      "Muffin",
+      "Macaron",
+      "Cookie",
+      "Éclair",
+      "Chou à la crème",
+      "Gâteau du jour"
+    ]
+  }
+}
