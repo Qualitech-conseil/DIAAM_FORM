@@ -1,12 +1,18 @@
-{
-  "logo": "logo.png",
+config = {
+  "clientName": "Client 1",
+  "title": "Sondage - Client 1",
+  "logo": "https://via.placeholder.com/300x80?text=Client+1+Logo",
+  "color": "#346beb",
   "categories": [
     {
-      "name": "Cat\u00e9gorie A",
-      "products": [
-        "Prod1",
-        "Prod2"
-      ]
+      "id": "produits",
+      "question": "Quels produits utilisez-vous ?",
+      "options": ["Produit A", "Produit B", "Produit C", "Produit D", "Produit E"]
+    },
+    {
+      "id": "services",
+      "question": "Quels services vous intéressent ?",
+      "options": ["Service 1", "Service 2", "Service 3", "Service 4", "Service 5"]
     }
   ]
 }
