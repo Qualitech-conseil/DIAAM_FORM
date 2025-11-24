@@ -1,0 +1,1 @@
+create table responses(id uuid primary key default uuid_generate_v4(),client text,data jsonb,created_at timestamp default now());

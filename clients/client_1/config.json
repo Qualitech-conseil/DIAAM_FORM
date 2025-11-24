@@ -1,0 +1,12 @@
+{
+  "logo": "logo.png",
+  "categories": [
+    {
+      "name": "Cat\u00e9gorie A",
+      "products": [
+        "Prod1",
+        "Prod2"
+      ]
+    }
+  ]
+}
