@@ -36,3 +36,149 @@
 
     <div id="debug" style="font-size:12px;color:#6b7280;margin-top:8px"></div>
   </div>
+
+<script>
+/* ================== CONFIG - remplis les valeurs ================== */
+const SUPABASE_URL = "https://vawvmiosgslvykfqxffs.supabase.co"; // ex: https://xxxxx.supabase.co
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZhd3ZtaW9zZ3NsdnlrZnF4ZmZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM5NjcxNTAsImV4cCI6MjA3OTU0MzE1MH0.T_q5fT1PCOt_pwEFdoKqePFYp7N4IXZSN1XA3HGG5v8"; // clé anon publique
+const RESPONSES_TABLE = "responses";
+/* ================================================================ */
+
+let config = null;
+let clientId = null;
+let supabase = null;
+
+function debug(msg){ const el = document.getElementById('debug'); if(el) el.innerText = msg; console.log(msg); }
+
+async function init() {
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    clientId = urlParams.get('client');
+    if(!clientId){
+      document.getElementById('app').innerHTML = '<p>Paramètre client manquant. Ajoutez ?client=client_1 à l\\'URL.</p>';
+      return;
+    }
+
+    if(!SUPABASE_URL || !SUPABASE_ANON){
+      debug('⚠️ SUPABASE_URL ou SUPABASE_ANON non définis. Remplis-les dans le fichier.');
+    }
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+    await loadConfig();
+    buildForm();
+    attachEvents();
+    document.getElementById('submit-btn').style.display = 'block';
+  } catch(err){
+    console.error(err);
+    document.getElementById('status').innerText = 'Erreur d\\'initialisation : ' + (err.message || err);
+  }
+}
+
+async function loadConfig(){
+  const configUrl = `clients/${clientId}/config.json`;
+  debug('Chargement configuration: '+configUrl);
+  const resp = await fetch(configUrl);
+  if(!resp.ok){
+    throw new Error('Impossible de charger config: ' + resp.status + ' ' + resp.statusText);
+  }
+  config = await resp.json();
+
+  // set logo/title/theme
+  if(config.logo){
+    const img = document.getElementById('client-logo');
+    img.src = config.logo;
+    img.style.display = 'block';
+  }
+  document.getElementById('form-title').innerText = config.title || 'Sondage';
+  if(config.color) document.documentElement.style.setProperty('--theme', config.color);
+
+  // basic validation
+  if(!Array.isArray(config.categories) || config.categories.length===0){
+    throw new Error('Le fichier config.json doit contenir un tableau "categories" non vide.');
+  }
+}
+
+function buildForm(){
+  if(!config) throw new Error('config non chargé');
+  const form = document.getElementById('survey-form');
+  form.innerHTML = '';
+
+  config.categories.forEach(cat => {
+    const block = document.createElement('div'); block.className = 'category-block';
+    const q = document.createElement('h3'); q.innerText = cat.question; block.appendChild(q);
+
+    // options
+    cat.options.forEach((opt, idx) => {
+      const line = document.createElement('label'); line.className = 'option-line';
+      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.name = cat.id; cb.value = opt; cb.id = `${cat.id}_${idx}`;
+      const span = document.createElement('span'); span.innerText = opt;
+      line.appendChild(cb); line.appendChild(span); block.appendChild(line);
+    });
+
+    // Autre
+    const otherLine = document.createElement('div'); otherLine.className='option-line';
+    const otherCb = document.createElement('input'); otherCb.type='checkbox'; otherCb.name=cat.id; otherCb.value='Autre'; otherCb.id=`${cat.id}_autre`;
+    const otherSpan = document.createElement('span'); otherSpan.innerText = 'Autre';
+    const otherInput = document.createElement('input'); otherInput.type='text'; otherInput.placeholder='Précisez...'; otherInput.className='other-input'; otherInput.id = `other-${cat.id}`;
+    otherLine.appendChild(otherCb); otherLine.appendChild(otherSpan); otherLine.appendChild(otherInput);
+    block.appendChild(otherLine);
+
+    otherCb.addEventListener('change', (e)=>{ otherInput.style.display = e.target.checked ? 'block' : 'none'; });
+
+    form.appendChild(block);
+  });
+
+  // accessibility: focus first checkbox
+  const firstCheckbox = form.querySelector('input[type="checkbox"]');
+  if(firstCheckbox) firstCheckbox.focus();
+}
+
+function attachEvents(){
+  document.getElementById('submit-btn').addEventListener('click', submitForm);
+}
+
+async function submitForm(e){
+  try{
+    document.getElementById('status').innerText = '';
+    if(!config) { alert('Configuration non chargée'); return; }
+    if(!supabase) { alert('Supabase non initialisé'); return; }
+
+    const grouped = config.categories.map(cat => {
+      const checks = Array.from(document.querySelectorAll(`input[name="${cat.id}"]:checked`));
+      const choices = checks.map(c=>c.value);
+      const otherVals = [];
+      if(choices.includes('Autre')){
+        const otherInput = document.getElementById(`other-${cat.id}`);
+        if(otherInput && otherInput.value && otherInput.value.trim()) otherVals.push(otherInput.value.trim());
+      }
+      return { category_id: cat.id, question: cat.question, choices, other_values: otherVals };
+    });
+
+    const nonEmpty = grouped.filter(g => (g.choices && g.choices.length > 0) || (g.other_values && g.other_values.length > 0));
+    if(nonEmpty.length === 0){ alert('Sélectionnez au moins une option.'); return; }
+
+    // payload
+    const payload = { client: clientId, data: nonEmpty };
+
+    // insert
+    const { data, error } = await supabase.from(RESPONSES_TABLE).insert([payload]);
+    if(error){
+      console.error('Supabase error', error);
+      alert('Erreur enregistrement: ' + (error.message || JSON.stringify(error)));
+      return;
+    }
+
+    document.getElementById('status').innerText = 'Merci — vos réponses ont été enregistrées.';
+    document.getElementById('submit-btn').disabled = true;
+  }catch(err){
+    console.error(err);
+    alert('Erreur: ' + (err.message || err));
+  }
+}
+
+// kick off
+init();
+</script>
+</body>
+</html>
+""")
