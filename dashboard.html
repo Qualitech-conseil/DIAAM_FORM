@@ -1,1 +1,146 @@
-<!DOCTYPE html><html><body><h1>Dashboard Admin</h1></body></html>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Statistiques</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body { font-family: Arial, sans-serif; padding: 20px; }
+h1, h2 { margin-bottom: 15px; }
+select, button { padding: 8px; margin-right: 10px; margin-bottom: 20px; }
+canvas { max-width: 100%; margin-bottom: 40px; }
+table { border-collapse: collapse; width: 100%; margin-bottom: 40px; }
+th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+th { background-color: #f2f2f2; }
+</style>
+</head>
+
+<body>
+<h1>Dashboard des Réponses</h1>
+
+<label>Filtrer par client :
+<select id="clientFilter">
+<option value="">Tous</option>
+</select>
+</label>
+
+<label>Filtrer par catégorie :
+<select id="categoryFilter">
+<option value="">Toutes</option>
+</select>
+</label>
+
+<button id="refreshBtn">Rafraîchir</button>
+
+<h2>Graphique Top Produits</h2>
+<canvas id="topProductsChart"></canvas>
+
+<h2>Tableau des réponses</h2>
+<table>
+<thead>
+<tr>
+<th>Client</th>
+<th>Date</th>
+<th>Catégorie</th>
+<th>Produits sélectionnés</th>
+<th>Autre</th>
+</tr>
+</thead>
+<tbody id="responsesTable"></tbody>
+</table>
+
+<script type="module">
+const SUPABASE_URL = "https://vawvmiosgslvykfqxffs.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZhd3ZtaW9zZ3NsdnlrZnF4ZmZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM5NjcxNTAsImV4cCI6MjA3OTU0MzE1MH0.T_q5fT1PCOt_pwEFdoKqePFYp7N4IXZSN1XA3HGG5v8";
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
+
+let allData = [];
+
+async function loadData() {
+    const { data, error } = await supabase.from("responses").select("*").order('submitted_at', {ascending:false});
+    if (error) {
+        alert("Erreur: " + error.message);
+        return;
+    }
+    allData = data;
+    populateFilters();
+    renderDashboard();
+}
+
+function populateFilters() {
+    const clientSet = new Set();
+    const categorySet = new Set();
+    allData.forEach(r => {
+        clientSet.add(r.client_id);
+        Object.keys(r.data).forEach(cat => categorySet.add(cat));
+    });
+
+    const clientFilter = document.getElementById("clientFilter");
+    clientFilter.innerHTML = `<option value="">Tous</option>`;
+    clientSet.forEach(c => clientFilter.innerHTML += `<option value="${c}">${c}</option>`);
+
+    const categoryFilter = document.getElementById("categoryFilter");
+    categoryFilter.innerHTML = `<option value="">Toutes</option>`;
+    categorySet.forEach(c => categoryFilter.innerHTML += `<option value="${c}">${c}</option>`);
+}
+
+function renderDashboard() {
+    const clientFilter = document.getElementById("clientFilter").value;
+    const categoryFilter = document.getElementById("categoryFilter").value;
+
+    const filtered = allData.filter(r => {
+        return (!clientFilter || r.client_id === clientFilter);
+    });
+
+    // Construire tableau
+    const tbody = document.getElementById("responsesTable");
+    tbody.innerHTML = "";
+    filtered.forEach(r => {
+        Object.entries(r.data).forEach(([cat, v]) => {
+            if(categoryFilter && categoryFilter!==cat) return;
+            tbody.innerHTML += `<tr>
+                <td>${r.client_id}</td>
+                <td>${new Date(r.submitted_at).toLocaleString()}</td>
+                <td>${cat}</td>
+                <td>${v.selected.join(", ")}</td>
+                <td>${v.other || ""}</td>
+            </tr>`;
+        });
+    });
+
+    // Construire top produits
+    const counts = {};
+    filtered.forEach(r => {
+        Object.entries(r.data).forEach(([cat, v]) => {
+            if(categoryFilter && categoryFilter!==cat) return;
+            v.selected.forEach(p => {
+                counts[p] = (counts[p]||0)+1;
+            });
+            if(v.other) counts[v.other] = (counts[v.other]||0)+1;
+        });
+    });
+
+    const labels = Object.keys(counts);
+    const values = Object.values(counts);
+
+    const ctx = document.getElementById("topProductsChart").getContext("2d");
+    if(window.topProductsChart) window.topProductsChart.destroy();
+    window.topProductsChart = new Chart(ctx, {
+        type: 'bar',
+        data: { labels, datasets: [{ label:'Sélections', data:values, backgroundColor:'rgba(54, 162, 235, 0.7)'}] },
+        options: { responsive:true, plugins:{legend:{display:false}} }
+    });
+}
+
+document.getElementById("clientFilter").addEventListener("change", renderDashboard);
+document.getElementById("categoryFilter").addEventListener("change", renderDashboard);
+document.getElementById("refreshBtn").addEventListener("click", loadData);
+
+loadData();
+</script>
+</body>
+</html>
